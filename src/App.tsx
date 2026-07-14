@@ -71,6 +71,15 @@ const TOOL_PRESETS: Record<string, PresetPlan[]> = {
   ]
 };
 
+const getApiUrl = (path: string): string => {
+  const isProdBackend = window.location.hostname.includes("asia-east1.run.app") || window.location.hostname.includes("localhost") || window.location.hostname === "127.0.0.1";
+  if (!isProdBackend) {
+    // If running on workers.dev or another external static host, proxy to the Cloud Run server
+    return `https://ais-pre-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app${path}`;
+  }
+  return path;
+};
+
 export default function App() {
   // Shared audit states
   const [sharedAuditId, setSharedAuditId] = useState<string | null>(null);
@@ -183,7 +192,7 @@ export default function App() {
     setSharedError(null);
 
     try {
-      const res = await fetch(`/api/share/${id}`);
+      const res = await fetch(getApiUrl(`/api/share/${id}`));
       if (!res.ok) {
         throw new Error("This audit report does not exist or was deleted.");
       }
@@ -246,7 +255,7 @@ export default function App() {
   const fetchAiSummary = async (result: AuditResult) => {
     setAiLoading(true);
     try {
-      const res = await fetch("/api/summary", {
+      const res = await fetch(getApiUrl("/api/summary"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result)
@@ -308,7 +317,7 @@ export default function App() {
     setLeadMessage("");
 
     try {
-      const res = await fetch("/api/lead", {
+      const res = await fetch(getApiUrl("/api/lead"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -356,7 +365,7 @@ export default function App() {
         setLeadMessage("Saved securely to Firestore!");
       } catch (fallbackErr: any) {
         console.error("Firestore client fallback also failed:", fallbackErr);
-        setLeadError(err.message || "Failed to submit lead.");
+        setLeadError(fallbackErr.message || err.message || "Failed to submit lead.");
       }
     } finally {
       setLeadSubmitting(false);
@@ -369,7 +378,7 @@ export default function App() {
     setShareCopied(false);
 
     try {
-      const res = await fetch("/api/share", {
+      const res = await fetch(getApiUrl("/api/share"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -449,7 +458,7 @@ export default function App() {
         setTimeout(() => setShareCopied(false), 3000);
       } catch (fallbackErr: any) {
         console.error("Firestore share fallback also failed:", fallbackErr);
-        alert(err.message || "Failed to compile share link. Please try again.");
+        alert(fallbackErr.message || err.message || "Failed to compile share link. Please try again.");
       }
     } finally {
       setShareLoading(false);
