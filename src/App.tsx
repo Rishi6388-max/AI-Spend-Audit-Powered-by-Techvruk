@@ -112,11 +112,16 @@ export default function App() {
   // Parse path for shared audits on load
   useEffect(() => {
     const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryShareId = searchParams.get("share");
+
     if (path.startsWith("/share/")) {
       const id = path.split("/share/")[1];
       if (id && id.trim().length > 0) {
         loadSharedAudit(id);
       }
+    } else if (queryShareId && queryShareId.trim().length > 0) {
+      loadSharedAudit(queryShareId);
     } else {
       // Local storage persistence for normal entry
       const savedTools = localStorage.getItem("ais_audit_tools");
@@ -188,7 +193,24 @@ export default function App() {
       // Fetch AI summary if present or request new one
       fetchAiSummary(data.auditResult);
     } catch (err: any) {
-      setSharedError(err.message || "Failed to load shared audit.");
+      console.warn("Failed to load shared audit via API, falling back to direct client-side Firestore:", err);
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const { db } = await import("./lib/firebase");
+        const docRef = doc(db, "audits", id);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setAuditResult(data.auditResult);
+          if (data.auditResult) {
+            fetchAiSummary(data.auditResult);
+          }
+        } else {
+          throw new Error("This audit report does not exist or was deleted.");
+        }
+      } catch (fallbackErr: any) {
+        setSharedError(fallbackErr.message || "Failed to load shared audit.");
+      }
     } finally {
       setSharedLoading(false);
     }
@@ -229,11 +251,25 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result)
       });
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `HTTP error ${res.status}`);
+      }
       setAiSummary(data.summary);
     } catch (err) {
-      console.error("Failed to generate AI executive review:", err);
-      setAiSummary("Unable to compile AI analysis. Please implement recommendations manually.");
+      console.warn("Failed to generate AI executive review via API, generating locally:", err);
+      // Fallback local summary generator matching the logic in server.ts
+      const largestSaving = [...result.toolResults].sort((a, b) => b.savings - a.savings)[0];
+      const mainLeakText = largestSaving && largestSaving.savings > 0 
+        ? `The single largest optimization opportunity lies in your ${largestSaving.name} setup, where you can reclaim $${largestSaving.savings}/month in immediate savings.`
+        : "Your stack is already highly optimized, with minimal duplicate tool costs.";
+    
+      const localSummary = `Based on your AI stack audit, your team of ${result.teamSize} can optimize current subscriptions to save $${result.totalMonthlySavings}/month (amounting to $${result.totalAnnualSavings}/year). ${mainLeakText} Consolidating redundant licenses and downgrading oversized plans directly improves your operating margins and extends runway, all with zero impact on actual team productivity or engineering velocity.`;
+      setAiSummary(localSummary);
     } finally {
       setAiLoading(false);
     }
@@ -299,9 +335,29 @@ export default function App() {
       }
 
       setLeadSubmitted(true);
-      setLeadMessage(data.message);
+      setLeadMessage(data.message || "Lead recorded successfully.");
     } catch (err: any) {
-      setLeadError(err.message || "An error occurred. Please try again.");
+      console.warn("API save lead failed, falling back to direct client-side Firestore:", err);
+      try {
+        const { collection, addDoc } = await import("firebase/firestore");
+        const { db } = await import("./lib/firebase");
+        
+        const leadCol = collection(db, "leads");
+        await addDoc(leadCol, {
+          email: leadEmail,
+          companyName: leadCompany || "",
+          role: leadRole || "",
+          teamSize: Number(teamSize) || 1,
+          auditId: sharedAuditId || "",
+          createdAt: new Date().toISOString()
+        });
+
+        setLeadSubmitted(true);
+        setLeadMessage("Saved securely to Firestore!");
+      } catch (fallbackErr: any) {
+        console.error("Firestore client fallback also failed:", fallbackErr);
+        setLeadError(err.message || "Failed to submit lead.");
+      }
     } finally {
       setLeadSubmitting(false);
     }
@@ -342,8 +398,59 @@ export default function App() {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 3000);
     } catch (err: any) {
-      console.error("Failed to generate sharing URL:", err);
-      alert(err.message || "Failed to compile share link. Please try again.");
+      console.warn("API share failed, falling back to direct client-side Firestore:", err);
+      try {
+        const { collection, addDoc } = await import("firebase/firestore");
+        const { db } = await import("./lib/firebase");
+
+        // Clean up data
+        const cleanInput = {
+          teamSize,
+          primaryUseCase,
+          tools: toolsList.map((t: any) => ({
+            name: t.name,
+            plan: t.plan,
+            monthlySpend: t.monthlySpend,
+            seats: t.seats
+          }))
+        };
+
+        const cleanResult = {
+          totalCurrentSpend: auditResult.totalCurrentSpend,
+          totalRecommendedSpend: auditResult.totalRecommendedSpend,
+          totalMonthlySavings: auditResult.totalMonthlySavings,
+          totalAnnualSavings: auditResult.totalAnnualSavings,
+          teamSize: auditResult.teamSize,
+          primaryUseCase: auditResult.primaryUseCase,
+          toolResults: auditResult.toolResults.map((tr: any) => ({
+            name: tr.name,
+            plan: tr.plan,
+            currentSpend: tr.currentSpend,
+            recommendedAction: tr.recommendedAction,
+            recommendedSpend: tr.recommendedSpend,
+            savings: tr.savings,
+            reason: tr.reason
+          }))
+        };
+
+        const shareCol = collection(db, "audits");
+        const docRef = await addDoc(shareCol, {
+          auditInput: cleanInput,
+          auditResult: cleanResult,
+          createdAt: new Date().toISOString()
+        });
+
+        const fullUrl = `${window.location.origin}/?share=${docRef.id}`;
+        setShareUrl(fullUrl);
+        setSharedAuditId(docRef.id);
+
+        await navigator.clipboard.writeText(fullUrl);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 3000);
+      } catch (fallbackErr: any) {
+        console.error("Firestore share fallback also failed:", fallbackErr);
+        alert(err.message || "Failed to compile share link. Please try again.");
+      }
     } finally {
       setShareLoading(false);
     }
