@@ -75,7 +75,7 @@ const getApiUrl = (path: string): string => {
   const isProdBackend = window.location.hostname.includes("asia-east1.run.app") || window.location.hostname.includes("localhost") || window.location.hostname === "127.0.0.1";
   if (!isProdBackend) {
     // If running on workers.dev or another external static host, proxy to the Cloud Run server
-    return `https://ais-pre-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app${path}`;
+    return `https://ais-dev-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app${path}`;
   }
   return path;
 };
