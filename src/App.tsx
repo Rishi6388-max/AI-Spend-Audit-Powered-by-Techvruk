@@ -285,7 +285,15 @@ export default function App() {
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `HTTP error ${res.status}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to submit lead.");
       }
@@ -314,8 +322,16 @@ export default function App() {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `HTTP error ${res.status}`);
+      }
+
+      if (!res.ok) throw new Error(data.error || "Failed to compile share link.");
 
       const fullUrl = `${window.location.origin}/share/${data.id}`;
       setShareUrl(fullUrl);
@@ -325,9 +341,9 @@ export default function App() {
       await navigator.clipboard.writeText(fullUrl);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to generate sharing URL:", err);
-      alert("Failed to compile share link. Please try again.");
+      alert(err.message || "Failed to compile share link. Please try again.");
     } finally {
       setShareLoading(false);
     }
