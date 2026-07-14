@@ -1,0 +1,6 @@
+{
+  "name": "AI Spend Audit",
+  "description": "Analyze your startup's AI tool spend, discover overspending, find cheaper alternatives or plan downgrades, and get an AI-powered personalized audit summary.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
