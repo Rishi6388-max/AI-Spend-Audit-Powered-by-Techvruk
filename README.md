@@ -4,11 +4,6 @@ An interactive, B2B lead-generation web application designed to help startups an
 
 ---
 
-## 📷 Product Screenshot Mockups & Loom Walkthrough
-* **Product Overview**: [Loom Walkthrough Video (Placeholder)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
-* **Desktop Audit View**: [Live Preview Dashboard](https://ais-pre-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app)
-* **Mobile Responsiveness**: Designed with touch-safe target density and elegant, collapsable visual cards.
-
 ---
 
 ## 🚀 Quick Start: Installation & Local Development
@@ -77,4 +72,4 @@ Here are five key architectural and product trade-offs made during development a
 ---
 
 ## 🌐 Live Deployed URL
-* **Production Deployed Web App**: [https://ais-pre-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app](https://ais-pre-fkzk4sbl3vso4pvbwc62yo-642686373814.asia-east1.run.app)
+* **Production Deployed Web App**: (https://ai-spend-audit-powered-by-techvruk.dwivedirishiprasad.workers.dev)
